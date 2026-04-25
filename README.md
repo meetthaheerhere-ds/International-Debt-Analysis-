@@ -28,8 +28,8 @@ This project analyzes global debt data using Python, MySQL, and Streamlit. It tr
 📁 Project Structure
 
 * app.py → Data processing & MySQL insertion
-* dashboard.py → Streamlit dashboard
-* debt_project.sql → Database schema
+* db.py → Streamlit dashboard
+* mini project 2.sql → Database schema
 * data/ → Dataset
 
 ---
@@ -72,5 +72,6 @@ streamlit run dashboard.py
 
 ---
 👨‍💻 Author
+Thaheer
 
 Thaheer
