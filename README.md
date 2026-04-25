@@ -71,7 +71,7 @@ streamlit run dashboard.py
 * Business insights
 
 ---
-👨‍💻 Author
-Thaheer
+👨‍💻 Author   
+
 
 Thaheer
