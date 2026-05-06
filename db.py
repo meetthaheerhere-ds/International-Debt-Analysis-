@@ -3,6 +3,9 @@ import pandas as pd
 import mysql.connector
 import plotly.express as px
 
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(page_title="Debt Dashboard", layout="wide")
+
 # ---------------- DB CONNECTION ----------------
 def get_connection():
     return mysql.connector.connect(
@@ -22,71 +25,71 @@ def load_data():
 
 df = load_data().copy()
 
-# CHECK
 if df.empty:
-    st.error("❌ No data found in database. Please run debt_analysis.py first.")
+    st.error("❌ No data found. Run app.py first.")
     st.stop()
 
 st.success("✅ Data Loaded Successfully")
-st.caption(f"Dataset Shape: {df.shape}")
 
 # ---------------- TITLE ----------------
 st.title("🌍 International Debt Analysis Dashboard")
 
-# ---------------- SIDEBAR ----------------
-st.sidebar.title("Navigation")
+# ---------------- NAV ----------------
 menu = st.sidebar.radio("Go to", ["Dashboard", "SQL Analysis", "Insights"])
 
 # =====================================================
-# 📊 DASHBOARD
+# 📊 DASHBOARD (WITH FILTER)
 # =====================================================
 if menu == "Dashboard":
 
+    st.sidebar.header("🔍 Filter")
+
+    countries = ["All"] + sorted(df["country_name"].unique())
+    selected_country = st.sidebar.selectbox("Select Country", countries)
+
+    if selected_country != "All":
+        filtered_df = df[df["country_name"] == selected_country]
+    else:
+        filtered_df = df.copy()
+
+    st.caption(f"Showing data for: {selected_country}")
+
     st.subheader("📊 Overview")
 
-    total_debt = df["value"].sum()
-    total_countries = df["country_name"].nunique()
-    total_indicators = df["series_name"].nunique()
-
     col1, col2, col3 = st.columns(3)
-    col1.metric("Total Debt", f"${total_debt:,.0f}")
-    col2.metric("Countries", total_countries)
-    col3.metric("Indicators", total_indicators)
+    col1.metric("Total Debt", f"${filtered_df['value'].sum():,.0f}")
+    col2.metric("Countries", filtered_df["country_name"].nunique())
+    col3.metric("Indicators", filtered_df["series_name"].nunique())
+
+    st.markdown("---")
 
     # Top Countries
-    st.subheader("🏆 Top 10 Countries by Debt")
-    top_countries = df.groupby("country_name")["value"].sum().reset_index()
-    top_countries = top_countries.sort_values(by="value", ascending=False).head(10)
+    st.subheader("🏆 Top Countries by Debt")
+    top = filtered_df.groupby("country_name")["value"].sum().reset_index().sort_values(by="value", ascending=False).head(10)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.dataframe(top_countries)
-    with col2:
-        st.plotly_chart(px.bar(top_countries, x="country_name", y="value", text_auto=True))
+    st.plotly_chart(px.bar(top, x="country_name", y="value", text_auto=True),
+                    use_container_width=True, key="dash1")
+
+    st.markdown("---")
 
     # Indicator
     st.subheader("📌 Debt by Indicator")
-    indicator = df.groupby("series_name")["value"].sum().reset_index()
-    indicator = indicator.sort_values(by="value", ascending=False).head(10)
+    ind = filtered_df.groupby("series_name")["value"].sum().reset_index().sort_values(by="value", ascending=False).head(10)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.dataframe(indicator)
-    with col2:
-        st.plotly_chart(px.pie(indicator, names="series_name", values="value"))
+    st.plotly_chart(px.pie(ind, names="series_name", values="value"),
+                    use_container_width=True, key="dash2")
+
+    st.markdown("---")
 
     # Trend
-    st.subheader("📈 Year-wise Debt Trend")
-    trend = df.groupby("year")["value"].sum().reset_index()
+    st.subheader("📈 Year-wise Trend")
+    trend = filtered_df.groupby("year")["value"].sum().reset_index()
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.dataframe(trend)
-    with col2:
-        st.plotly_chart(px.line(trend, x="year", y="value", markers=True))
+    st.plotly_chart(px.line(trend, x="year", y="value", markers=True),
+                    use_container_width=True, key="dash3")
 
 # =====================================================
-# 🚀 SQL ANALYSIS (ONLY CHANGE HERE)
+# 🚀 SQL ANALYSIS (NO FILTER)
 # =====================================================
 elif menu == "SQL Analysis":
 
@@ -94,10 +97,10 @@ elif menu == "SQL Analysis":
 
     query_labels = {
         "1. Retrieve all distinct country names": "SELECT DISTINCT country_name FROM debt_data",
-        "2. Count total number of countries": "SELECT COUNT(DISTINCT country_name) AS total_countries FROM debt_data",
-        "3. Total number of indicators": "SELECT COUNT(DISTINCT series_code) AS total_indicators FROM debt_data",
+        "2. Count total number of countries": "SELECT COUNT(DISTINCT country_name) FROM debt_data",
+        "3. Total number of indicators": "SELECT COUNT(DISTINCT series_code) FROM debt_data",
         "4. First 10 records": "SELECT * FROM debt_data LIMIT 10",
-        "5. Total global debt": "SELECT SUM(value) AS total_global_debt FROM debt_data",
+        "5. Total global debt": "SELECT SUM(value) FROM debt_data",
         "6. Unique indicator names": "SELECT DISTINCT series_name FROM debt_data",
         "7. Number of records per country": "SELECT country_name, COUNT(*) FROM debt_data GROUP BY country_name",
         "8. Debt > 1 billion USD": "SELECT * FROM debt_data WHERE value > 1000000000",
@@ -133,9 +136,9 @@ elif menu == "SQL Analysis":
         SUM(value) OVER (PARTITION BY country_name ORDER BY year)
         FROM debt_data""",
         "28. Indicators above overall average": "SELECT series_name, AVG(value) FROM debt_data GROUP BY series_name HAVING AVG(value) > (SELECT AVG(value) FROM debt_data)",
-        "29. Countries contributing >5% global debt": """SELECT country_name, SUM(value) AS total,
-        (SUM(value)/(SELECT SUM(value) FROM debt_data))*100 AS percentage
-        FROM debt_data GROUP BY country_name HAVING percentage > 5""",
+        "29. Countries contributing >5% global debt": """SELECT country_name, SUM(value),
+        (SUM(value)/(SELECT SUM(value) FROM debt_data))*100 FROM debt_data GROUP BY country_name
+        HAVING (SUM(value)/(SELECT SUM(value) FROM debt_data))*100 > 5""",
         "30. Most dominant indicator per country": """SELECT * FROM (
         SELECT country_name, series_name, SUM(value),
         RANK() OVER (PARTITION BY country_name ORDER BY SUM(value) DESC) rnk
@@ -143,128 +146,132 @@ elif menu == "SQL Analysis":
         ) t WHERE rnk=1"""
     }
 
-    selected_label = st.selectbox("Select Query", list(query_labels.keys()))
+    selected = st.selectbox("Select Query", list(query_labels.keys()))
 
     conn = get_connection()
-    result = pd.read_sql(query_labels[selected_label], conn)
+    result = pd.read_sql(query_labels[selected], conn)
     conn.close()
 
-    st.caption(f"Running: {selected_label}")
+    st.markdown("---")
 
-    col1, col2 = st.columns(2)
+    st.dataframe(result, use_container_width=True)
 
-    with col1:
-        st.dataframe(result)
-
-    with col2:
-        try:
-            if result.shape[1] >= 2:
-                st.plotly_chart(px.bar(result, x=result.columns[0], y=result.columns[1]))
-        except:
-            pass
+    if result.shape[1] >= 2:
+        st.plotly_chart(px.bar(result, x=result.columns[0], y=result.columns[1]),
+                        use_container_width=True,
+                        key=f"sql_{selected}")
 
 
 # =====================================================
-# 📊 INSIGHTS
+# 📊 INSIGHTS (WITH FILTER + TITLES + CLEAN UI)
 # =====================================================
 elif menu == "Insights":
 
+    st.sidebar.header("🔍 Filter")
+
+    countries = ["All"] + sorted(df["country_name"].unique())
+    selected_country = st.sidebar.selectbox("Select Country", countries, key="insight_filter")
+
+    if selected_country != "All":
+        filtered_df = df[df["country_name"] == selected_country]
+    else:
+        filtered_df = df.copy()
+
+    st.caption(f"Showing data for: {selected_country}")
+
     st.subheader("📊 Key Insights")
 
-    country_dist = df.groupby("country_name")["value"].sum().reset_index()
-    country_dist = country_dist.sort_values(by="value", ascending=False)
+    country = filtered_df.groupby("country_name")["value"].sum().reset_index().sort_values(by="value", ascending=False)
+    indicator = filtered_df.groupby("series_name")["value"].sum().reset_index().sort_values(by="value", ascending=False)
+    trend = filtered_df.groupby("year")["value"].sum().reset_index()
 
-    indicator = df.groupby("series_name")["value"].sum().reset_index()
-    indicator = indicator.sort_values(by="value", ascending=False)
-
-    trend = df.groupby("year")["value"].sum().reset_index()
-
-    # ---------------- 1. Top 10 Countries ----------------
+    # ---------------- 1. Top 10 ----------------
     st.write("🔹 Country-wise Debt Distribution (Top 10)")
-    top10 = country_dist.head(10)
+    st.plotly_chart(
+        px.bar(country.head(10), x="country_name", y="value"),
+        use_container_width=True, key="i1"
+    )
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.dataframe(top10)
-    with col2:
-        st.plotly_chart(px.bar(top10, x="country_name", y="value", text_auto=True))
+    st.markdown("---")
 
-    # ---------------- 2. Highest Debt ----------------
+    # ---------------- 2. Highest ----------------
     st.write("🔹 Highest Debt Country")
-    highest = country_dist.head(1)
+    st.plotly_chart(
+        px.bar(country.head(1), x="country_name", y="value"),
+        use_container_width=True, key="i2"
+    )
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.dataframe(highest)
-    with col2:
-        st.plotly_chart(px.bar(highest, x="country_name", y="value"))
+    st.markdown("---")
 
-    # ---------------- 3. Lowest Debt ----------------
+    # ---------------- 3. Lowest ----------------
     st.write("🔹 Lowest Debt Country")
-    lowest = country_dist.tail(1)
+    st.plotly_chart(
+        px.bar(country.tail(1), x="country_name", y="value"),
+        use_container_width=True, key="i3"
+    )
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.dataframe(lowest)
-    with col2:
-        st.plotly_chart(px.bar(lowest, x="country_name", y="value"))
+    st.markdown("---")
 
-    # ---------------- 4. Indicator-wise ----------------
+    # ---------------- 4. Indicator ----------------
     st.write("🔹 Debt by Indicator (Top 10)")
-    top_indicator = indicator.head(10)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.dataframe(top_indicator)
-    with col2:
-        st.plotly_chart(px.pie(top_indicator, names="series_name", values="value"))
+    st.plotly_chart(
+        px.pie(indicator.head(10), names="series_name", values="value"),
+        use_container_width=True, key="i4"
+    )
 
     # =====================================================
-    # 🔥 ADDITIONAL INSIGHTS (4)
+    # 🔥 ADDITIONAL INSIGHTS
     # =====================================================
-    st.subheader("🔥 Additional Insights")
+    st.markdown("## 🔥 Additional Insights")
 
-    total = df["value"].sum()
+    total = filtered_df["value"].sum()
+    top10 = country.head(10).copy()
 
     # ---------------- 5. Contribution % ----------------
     st.write("✔ Top 10 Countries Contribution %")
-    top10["percentage"] = (top10["value"] / total) * 100
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.dataframe(top10)
-    with col2:
-        st.plotly_chart(px.bar(top10, x="country_name", y="percentage"))
+    if total != 0:
+        top10["percentage"] = (top10["value"] / total) * 100
+    else:
+        top10["percentage"] = 0
+
+    st.plotly_chart(
+        px.bar(top10, x="country_name", y="percentage"),
+        use_container_width=True, key="i5"
+    )
+
+    st.markdown("---")
 
     # ---------------- 6. Above Average ----------------
     st.write("✔ Countries Above Average Debt")
-    avg = country_dist["value"].mean()
-    above_avg = country_dist[country_dist["value"] > avg]
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.dataframe(above_avg.head(10))
-    with col2:
-        st.plotly_chart(px.bar(above_avg.head(10), x="country_name", y="value"))
+    avg = country["value"].mean()
+    above = country[country["value"] > avg]
+
+    st.plotly_chart(
+        px.bar(above.head(10), x="country_name", y="value"),
+        use_container_width=True, key="i6"
+    )
+
+    st.markdown("---")
 
     # ---------------- 7. Debt Range ----------------
     st.write("✔ Debt Range per Country")
-    debt_range = df.groupby("country_name")["value"].agg(["min", "max"]).reset_index()
-    debt_range["range"] = debt_range["max"] - debt_range["min"]
 
-    top_range = debt_range.sort_values(by="range", ascending=False).head(10)
+    rng = filtered_df.groupby("country_name")["value"].agg(["min", "max"]).reset_index()
+    rng["range"] = rng["max"] - rng["min"]
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.dataframe(top_range)
-    with col2:
-        st.plotly_chart(px.bar(top_range, x="country_name", y="range"))
+    st.plotly_chart(
+        px.bar(rng.head(10), x="country_name", y="range"),
+        use_container_width=True, key="i7"
+    )
 
-    # ---------------- 8. Year Trend ----------------
+    st.markdown("---")
+
+    # ---------------- 8. Trend ----------------
     st.write("✔ Global Debt Trend Over Time")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.dataframe(trend)
-    with col2:
-        st.plotly_chart(px.line(trend, x="year", y="value", markers=True))
+    st.plotly_chart(
+        px.line(trend, x="year", y="value", markers=True),
+        use_container_width=True, key="i8"
+    )
