@@ -30,8 +30,8 @@ Plotly – Interactive visualizations
  ┃ ┣ IDS_SeriesMetaData.csv
  ┃ ┗ IDS_FootNoteMetaData.csv
  ┣ 📄 app.py                → Data preprocessing & MySQL insertion
- ┣ 📄 dashboard.py         → Streamlit dashboard
- ┣ 📄 mini project 2.sql   → Database schema & queries
+ ┣ 📄 db.py                 → Streamlit dashboard
+ ┣ 📄 mini project 2.sql    → Database schema & queries
  ┣ 📄 README.md
  ┣ 📄 Presentation.pptx
  ┗ 📄 Documentation.pdf
